@@ -13,6 +13,7 @@
     ".opencode/",
     ".mcp.json",
     "scripts/",
+    "!scripts/helpers/__pycache__/",
     "agents/",
     "assets/",
     "bin/",
