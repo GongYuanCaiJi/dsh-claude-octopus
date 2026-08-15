@@ -1,0 +1,448 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+source "$SCRIPT_DIR/../helpers/test-framework.sh"
+test_suite "Docs Sync"
+
+set +o pipefail  # restore: original did not use pipefail
+
+cd "$PROJECT_ROOT"
+
+
+# Counters
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
+
+# Test result tracking
+declare -a FAILURES
+
+# Helper functions
+pass() { test_case "$1"; test_pass; }
+
+fail() { test_case "$1"; test_fail "${2:-$1}"; }
+
+warn() { echo "$1"; }
+
+info() { echo "$1"; }
+
+# Extract version from plugin.json
+get_plugin_version() {
+  if [ ! -f ".claude-plugin/plugin.json" ]; then
+    echo "ERROR: plugin.json not found"
+    exit 1
+  fi
+
+  # Extract version using grep and sed (portable, no jq needed)
+  # Use head -n 1 to get only the first version (main plugin version, not dependencies)
+  grep '"version"' .claude-plugin/plugin.json | head -n 1 | sed 's/.*"version": *"\([^"]*\)".*/\1/'
+}
+
+# Check if version appears in README badges
+check_readme_version() {
+  local version="$1"
+
+  if [ ! -f "README.md" ]; then
+    fail "README.md not found"
+    return 1
+  fi
+
+  if grep -q "Version-${version}" README.md; then
+    pass "README.md badge shows version ${version}"
+  else
+    fail "README.md badge does not show version ${version}"
+  fi
+}
+
+# Check if README body text matches actual command/skill/persona counts
+check_readme_counts() {
+  local actual_commands actual_skills actual_personas
+  actual_commands=$(python3 -c 'import json; print(len(json.load(open(".claude-plugin/plugin.json")).get("commands", [])))')
+  actual_skills=$(python3 -c 'import json; print(len(json.load(open(".claude-plugin/plugin.json")).get("skills", [])))')
+  actual_personas=$(find agents/personas -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+
+  if grep -q "${actual_commands} commands" README.md; then
+    pass "README body shows correct command count ($actual_commands)"
+  else
+    fail "README body has wrong command count (expected $actual_commands)"
+  fi
+
+  if grep -q "${actual_skills} skills" README.md; then
+    pass "README body shows correct skill count ($actual_skills)"
+  else
+    fail "README body has wrong skill count (expected $actual_skills)"
+  fi
+
+  if grep -q "${actual_personas}.*personas\|${actual_personas} specialized" README.md; then
+    pass "README body shows correct persona count ($actual_personas)"
+  else
+    fail "README body has wrong persona count (expected $actual_personas)"
+  fi
+}
+
+# Check if version appears in CHANGELOG
+check_changelog_version() {
+  local version="$1"
+
+  if [ ! -f "CHANGELOG.md" ]; then
+    fail "CHANGELOG.md not found"
+    return 1
+  fi
+
+  if grep -q "## \[${version}\]" CHANGELOG.md || grep -q "## ${version}" CHANGELOG.md; then
+    pass "CHANGELOG.md has entry for version ${version}"
+  else
+    fail "CHANGELOG.md missing entry for version ${version}"
+  fi
+}
+
+# Check README structure
+check_readme_structure() {
+  local readme="README.md"
+
+  info "\nValidating README.md structure..."
+
+  # Check required sections exist
+  local required_sections=(
+    "# Claude Octopus"
+    "## Quickstart"
+    "## [0-9]+ Commands That Matter Most"
+    "## How It Works"
+    "## Documentation"
+    "## Attribution"
+    "## Contributing"
+    "## License"
+  )
+
+  for section in "${required_sections[@]}"; do
+    # Allow emoji prefixes in section headers (e.g., "# 🐙 Claude Octopus")
+    local section_text="${section#\#* }"
+    if grep -Eq "^${section}" "$readme" || grep -qE "^#+ .*${section_text}" "$readme"; then
+      pass "README has section: $section"
+    else
+      fail "README missing section: $section"
+    fi
+  done
+
+  # Check if README mentions visual indicators (v7.4 feature)
+  if grep -q "Visual Indicators" "$readme" || grep -q "visual indicators" "$readme"; then
+    pass "README documents visual indicators (v7.4 feature)"
+  else
+    warn "README missing visual indicators documentation"
+  fi
+
+  # Check if README mentions natural language workflows (v7.4 feature)
+  if grep -q "Natural Language" "$readme" || grep -q "natural language" "$readme"; then
+    pass "README documents natural language workflows (v7.4 feature)"
+  else
+    warn "README missing natural language documentation"
+  fi
+
+  # Check README length (should be under 600 lines for plugin-first approach)
+  local line_count=$(wc -l < "$readme" | tr -d ' ')
+  if [ "$line_count" -le 600 ]; then
+    pass "README.md is concise ($line_count lines, target ≤600)"
+  else
+    warn "README.md is long ($line_count lines, target ≤600)"
+  fi
+}
+
+# Check documentation files exist
+check_docs_files() {
+  info "\nValidating documentation files..."
+
+  local required_docs=(
+    "docs/README.md"
+    "docs/COMMAND-REFERENCE.md"
+    "docs/ARCHITECTURE.md"
+  )
+
+  for doc in "${required_docs[@]}"; do
+    if [ -f "$doc" ]; then
+      pass "Documentation file exists: $doc"
+    else
+      fail "Missing documentation file: $doc"
+    fi
+  done
+}
+
+# Check all skill directories are registered in plugin.json (v9.38+)
+# Skills migrated from .claude/skills/*.md to skills/*/ directories
+check_skills_registered() {
+  info "\nValidating skill registration..."
+
+  local plugin_json=".claude-plugin/plugin.json"
+  local skills_dir="skills"
+
+  if [ ! -f "$plugin_json" ]; then
+    fail "plugin.json not found"
+    return 1
+  fi
+
+  if [ ! -d "$skills_dir" ]; then
+    fail "Skills directory not found: $skills_dir"
+    return 1
+  fi
+
+  # v9.38+: Skills are directories under skills/ containing SKILL.md
+  # plugin.json references them as ./skills/<name>
+  for skill_subdir in "$skills_dir"/*/; do
+    local skill_name=$(basename "$skill_subdir")
+    local skill_path="./skills/${skill_name}"
+
+    if [ ! -f "${skill_subdir}SKILL.md" ]; then
+      continue  # Skip dirs without SKILL.md (e.g. blocks/)
+    fi
+
+    if grep -q "\"${skill_path}\"" "$plugin_json"; then
+      pass "Skill registered: ${skill_name}"
+    else
+      fail "Skill NOT registered in plugin.json: ${skill_name}"
+    fi
+  done
+}
+
+# Check workflow skills exist (v7.5+: renamed to flow-*)
+check_workflow_skills() {
+  info "\nValidating workflow skills (v7.5+: flow-* naming)..."
+
+  # v7.9+: Double Diamond workflow phases
+  local workflow_skills=(
+    "flow-discover"
+    "flow-define"
+    "flow-develop"
+    "flow-deliver"
+  )
+
+  for skill_name in "${workflow_skills[@]}"; do
+    if [ -f ".claude/skills/${skill_name}/SKILL.md" ]; then
+      pass "Workflow skill exists: ${skill_name}"
+    else
+      fail "Missing workflow skill: ${skill_name}"
+    fi
+  done
+}
+
+# Check hooks configuration
+check_hooks_config() {
+  info "\nValidating hooks configuration..."
+
+  local hooks_json="hooks/hooks.json"
+
+  if [ ! -f "$hooks_json" ]; then
+    fail "hooks.json not found"
+    return 1
+  fi
+
+  # Documented hook schema: string matchers only; command-level regex filtering
+  # lives inside the hook scripts, so assert the scripts are wired, and the
+  # standard top-level "hooks" wrapper is present (issue #611).
+  if python3 -c "
+import json,sys
+d=json.load(open('$hooks_json'))
+sys.exit(0 if isinstance(d.get('hooks'), dict) and d['hooks'] else 1)
+" 2>/dev/null; then
+    pass "hooks.json has standard top-level hooks wrapper"
+  else
+    fail "hooks.json missing standard top-level hooks wrapper"
+  fi
+
+  if grep -q "workflow-indicator.sh\|orchestrate-guard.sh\|auto-router-inject.sh" "$hooks_json"; then
+    pass "hooks.json has orchestrate.sh workflow hooks"
+  else
+    fail "hooks.json missing orchestrate.sh workflow hooks"
+  fi
+
+  if grep -q "codex-exec-guard.sh" "$hooks_json"; then
+    pass "hooks.json has Codex CLI hook"
+  else
+    fail "hooks.json missing Codex CLI hook"
+  fi
+
+  if python3 -c "
+import json,sys
+d=json.load(open('$hooks_json'))
+ms=[b.get('matcher') for bs in d['hooks'].values() for b in bs if 'matcher' in b]
+sys.exit(0 if all(isinstance(m,str) for m in ms) else 1)
+" 2>/dev/null; then
+    pass "hooks.json matchers are documented string form"
+  else
+    fail "hooks.json contains non-string matchers"
+  fi
+}
+
+# Check debate skill (v7.5+: renamed to skill-debate.md)
+check_debate_skill() {
+  info "\nValidating debate skill (v7.5+: skill-debate naming)..."
+
+  # v7.5+: Primary skill is skill-debate.md, debate.md is a shortcut alias
+  local debate_skill=".claude/skills/skill-debate/SKILL.md"
+
+  # Check primary skill exists
+  if [ ! -f "$debate_skill" ]; then
+    fail "skill-debate/SKILL.md not found"
+    return 1
+  fi
+
+  # Check if SKILL.md has YAML frontmatter
+  if head -n 1 "$debate_skill" | grep -q "^---$"; then
+    pass "skill-debate/SKILL.md has YAML frontmatter"
+  else
+    fail "skill-debate/SKILL.md missing YAML frontmatter (required for Claude Code)"
+  fi
+
+  # Check if skill-debate is registered in plugin.json (directory format)
+  if grep -q "skill-debate" ".claude-plugin/plugin.json"; then
+    pass "skill-debate registered in plugin.json"
+  else
+    fail "skill-debate NOT registered in plugin.json"
+  fi
+
+  # Shortcut alias no longer needed in directory format
+}
+
+# Check marketplace.json version sync
+check_marketplace_version() {
+  info "\nValidating marketplace.json version sync..."
+
+  local marketplace_json=".claude-plugin/marketplace.json"
+  local plugin_json=".claude-plugin/plugin.json"
+
+  if [ ! -f "$marketplace_json" ]; then
+    fail "marketplace.json not found"
+    return 1
+  fi
+
+  if [ ! -f "$plugin_json" ]; then
+    fail "plugin.json not found"
+    return 1
+  fi
+
+  # Extract version from plugin.json
+  local plugin_version=$(grep '"version"' "$plugin_json" | head -n 1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+
+  if ! command -v jq >/dev/null 2>&1; then
+    fail "jq is required to parse marketplace.json"
+    return 1
+  fi
+
+  # Extract the octo plugin version, not marketplace metadata or sibling plugins.
+  local marketplace_version
+  if ! marketplace_version=$(jq -r '.plugins[] | select(.name == "octo") | .version // empty' "$marketplace_json"); then
+    fail "Unable to parse octo version from marketplace.json"
+    return 1
+  fi
+
+  # Check if versions match
+  if [ "$plugin_version" = "$marketplace_version" ]; then
+    pass "marketplace.json version matches plugin.json ($plugin_version)"
+  else
+    fail "marketplace.json version ($marketplace_version) does not match plugin.json ($plugin_version)"
+  fi
+
+  # Check if version appears at START of description
+  if grep -q "\"description\": \"v${plugin_version}" "$marketplace_json"; then
+    pass "marketplace.json description starts with version (v${plugin_version})"
+  else
+    fail "marketplace.json description should start with 'v${plugin_version} - ...'"
+  fi
+}
+
+# Check release validation parses the octo marketplace entry explicitly
+check_release_validator_marketplace_parser() {
+  info "\nValidating release marketplace parser..."
+
+  local release_validator="scripts/validate-release.sh"
+
+  if [ ! -f "$release_validator" ]; then
+    fail "validate-release.sh not found"
+    return 1
+  fi
+
+  if grep -Fq '.plugins[] | select(.name == "octo") | .version' "$release_validator"; then
+    pass "validate-release.sh selects octo marketplace version explicitly"
+  else
+    fail "validate-release.sh should select octo marketplace version explicitly"
+  fi
+
+  if grep -Fq 'grep -v "1.0.0"' "$release_validator"; then
+    fail "validate-release.sh should not filter marketplace versions with grep -v 1.0.0"
+  else
+    pass "validate-release.sh does not use marketplace version heuristic filter"
+  fi
+}
+
+# Check command YAML frontmatter (v7.5.5+)
+check_command_frontmatter() {
+  info "\nValidating command YAML frontmatter..."
+
+  local commands_dir="commands"
+
+  if [ ! -d "$commands_dir" ]; then
+    fail "Commands directory not found: $commands_dir"
+    return 1
+  fi
+
+  # Check each command file
+  for cmd_file in "$commands_dir"/*.md; do
+    if [ ! -f "$cmd_file" ]; then
+      continue
+    fi
+
+    local filename=$(basename "$cmd_file")
+
+    # Check if file has YAML frontmatter
+    if ! head -1 "$cmd_file" | grep -q "^---$"; then
+      fail "$filename: Missing YAML frontmatter"
+      continue
+    fi
+
+    # Check if it uses 'command:' field (correct)
+    if grep -q "^command:" "$cmd_file"; then
+      pass "$filename uses 'command:' field"
+    else
+      # Check if it incorrectly uses 'name:' field
+      if grep -q "^name:" "$cmd_file"; then
+        fail "$filename uses 'name:' instead of 'command:' (run: ./scripts/fix-command-frontmatter.sh)"
+      else
+        fail "$filename: No 'command:' field found"
+      fi
+    fi
+  done
+}
+
+# Main test execution
+echo "================================================================"
+echo "  Documentation Sync Validation Test Suite"
+echo "================================================================"
+echo
+
+# Get version from plugin.json
+VERSION=$(get_plugin_version)
+info "Current version from plugin.json: $VERSION"
+echo
+
+# Run test suites
+check_readme_version "$VERSION"
+check_readme_counts
+check_changelog_version "$VERSION"
+check_readme_structure
+check_docs_files
+check_skills_registered
+check_workflow_skills
+check_hooks_config
+check_debate_skill
+check_marketplace_version
+check_release_validator_marketplace_parser
+check_command_frontmatter
+
+# Summary
+echo
+echo "================================================================"
+echo "  Test Results Summary"
+echo "================================================================"
+echo
+test_summary

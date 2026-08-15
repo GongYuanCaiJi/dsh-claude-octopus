@@ -1,0 +1,77 @@
+#!/bin/bash
+# tests/smoke/test-detect-providers.sh
+# Tests provider detection logic
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+source "$SCRIPT_DIR/../helpers/test-framework.sh"
+source "$SCRIPT_DIR/../helpers/mock-helpers.sh"
+
+test_suite "Provider Detection"
+
+test_detect_both_providers() {
+    test_case "Detects both Codex and Antigravity when available"
+
+    # Test detection logic (dry run) - flag must come before command
+    local output exit_code=0
+    output=$(OCTOPUS_PROJECT_DIR="$PROJECT_ROOT" bash "$PROJECT_ROOT/scripts/orchestrate.sh" -n probe "test" 2>&1) || exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        test_pass
+    elif [[ "$(uname)" == "Darwin" && -z "$output" ]]; then
+        test_skip "orchestrate provider detection returned empty output on macOS CI shell; command smoke is covered on ubuntu"
+        return 0
+    else
+        test_fail "Provider detection dry-run failed (exit $exit_code): $output"
+        return 1
+    fi
+}
+
+test_detect_single_provider() {
+    test_case "Works with single provider available"
+
+    # Test detection (dry run) - flag must come before command
+    local output exit_code=0
+    output=$(OCTOPUS_PROJECT_DIR="$PROJECT_ROOT" bash "$PROJECT_ROOT/scripts/orchestrate.sh" -n probe "test" 2>&1) || exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        test_pass
+    elif [[ "$(uname)" == "Darwin" && -z "$output" ]]; then
+        test_skip "single-provider orchestrate detection returned empty output on macOS CI shell; command smoke is covered on ubuntu"
+        return 0
+    else
+        test_fail "Single provider dry-run should work (exit $exit_code): $output"
+        return 1
+    fi
+}
+
+test_provider_version_check() {
+    test_case "Provider commands are callable"
+
+    # Check if real providers exist
+    local has_codex=false
+    local has_agy=false
+
+    if command -v codex &>/dev/null; then
+        has_codex=true
+    fi
+
+    if command -v agy &>/dev/null; then
+        has_agy=true
+    fi
+
+    if [[ "$has_codex" == "true" ]] || [[ "$has_agy" == "true" ]]; then
+        test_pass
+    else
+        test_skip "No real providers installed"
+        return 0
+    fi
+}
+
+# Run tests
+test_detect_both_providers
+test_detect_single_provider
+test_provider_version_check
+
+test_summary

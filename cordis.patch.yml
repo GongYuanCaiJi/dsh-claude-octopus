@@ -1,0 +1,14 @@
+# dsh-claude-octopus bundle patch: mounts the plugin into the host composition
+# of a dsh profile. The plugin registers the `/octo` command into the shared
+# `commands` registry and the `octopus` provider into the shared `subagents`
+# registry, so every session of the profile can drive multi-AI orchestration.
+#
+# Install: `dsh plugin --profile <name> add <this package>` (npm or a local
+# path). The `dsh plugin` command pnpm-installs the package into the profile
+# and reconciles it into the profile's `dsh.profile.bundles` layer list.
+- insert:
+    - id: dsh-claude-octopus
+      # Node-resolvable package name — must stay in sync with package.json
+      # `name`.
+      name: dsh-claude-octopus
+      config: {}

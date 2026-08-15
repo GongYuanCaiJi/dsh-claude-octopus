@@ -1,0 +1,105 @@
+{
+  "name": "dsh-claude-octopus",
+  "version": "9.64.0",
+  "description": "multi-agent 编排（移植自 claude-octopus）",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    ".claude-plugin/",
+    ".codex-plugin/",
+    ".cursor-plugin/",
+    ".factory-plugin/",
+    ".opencode/",
+    ".mcp.json",
+    "scripts/",
+    "agents/",
+    "assets/",
+    "bin/",
+    "hooks/",
+    "skills/",
+    "config/workflows/",
+    "config/templates/",
+    "config/",
+    ".claude/",
+    "mcp-server/",
+    "openclaw/",
+    "managed-settings.d/",
+    "docs/",
+    "src/",
+    "dist/",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "Makefile"
+  ],
+  "scripts": {
+    "test": "npm run build && node --test test/*.test.mjs && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safetyfuse.allowStable GIT_CONFIG_VALUE_0=true make test",
+    "test:smoke": "make test-smoke",
+    "test:unit": "make test-unit",
+    "test:integration": "make test-integration",
+    "test:all": "make test-all",
+    "test:coverage": "make test-coverage",
+    "test:verbose": "make test-verbose",
+    "test:clean": "make clean-tests",
+    "prepublishOnly": "node -e \"const p=require('./package.json'); if(!/^\\d+\\.\\d+\\.\\d+$/.test(p.version)){process.exit(1)}\" && test -f scripts/orchestrate.sh && test -f README.md",
+    "prepare": "npm run build",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GongYuanCaiJi/dsh-claude-octopus.git"
+  },
+  "homepage": "https://github.com/GongYuanCaiJi/dsh-claude-octopus#readme",
+  "bugs": {
+    "url": "https://github.com/GongYuanCaiJi/dsh-claude-octopus/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "port",
+    "claude",
+    "claude-code",
+    "claude-code-plugin",
+    "ai",
+    "multi-agent",
+    "orchestration",
+    "codex",
+    "antigravity",
+    "multi-ai"
+  ],
+  "author": "GongYuanCaiJi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-subagent": "^0.1.0-rc.6"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-commands": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-shell": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subagent": "0.1.0-rc.6",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
