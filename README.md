@@ -120,6 +120,11 @@ MIT。上游 [`nyldn/claude-octopus`](https://github.com/nyldn/claude-octopus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-DeepSeek%20Harness-blue.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![Version](https://img.shields.io/badge/Version-9.64.0-blue)](https://github.com/nyldn/claude-octopus)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-v2.1.14+_required-blueviolet)](https://code.claude.com/docs/en/overview)
+
+Every AI model has blind spots. Claude Octopus supports ten external provider integrations — Codex, Antigravity CLI, Copilot, Qwen, Ollama, Perplexity, OpenRouter, OrcaRouter, OpenCode, and Grok — alongside the built-in Claude Code host, with consensus gates that flag disagreements before you ship.
+
+Claude Code **v2.1.14+** is the minimum supported runtime; the plugin tracks 182 Claude Code capability flags through Claude Code v2.1.219.
 
 > **One line: one `/octo` command, and multiple AI models (Codex, Antigravity, Copilot, Qwen, Ollama, OpenRouter, Grok, …) research, build, review and debate together — with a consensus gate before delivery.**
 
@@ -152,6 +157,41 @@ only the dsh plugin seams are adapted.
   consensus gate 75%  → disagreements listed explicitly
   → structured research report (summary / themes / takeaways / sources)
 ```
+
+## What's New
+
+<!-- BEGIN CURRENT RELEASE -->
+> 🆕 **v9.64.0 — Keep Octopus dormant until explicitly invoked.**
+>
+> **Default roster:** Claude Opus 5 leads architecture, planning, security reasoning, and final judgment; GPT-5.6 Sol is the independent implementation/review peer; Claude Sonnet 5 is the standard Claude seat; Fable 5 remains an opt-in judgment escalation. Existing model pins and provider configuration still win. See [the routing strategy](docs/MODEL-ROUTING-STRATEGY.md).
+<!-- END CURRENT RELEASE -->
+
+| Version | Best Features |
+|---------|--------------|
+| **v9.64.0** (new) | Keep Octopus dormant until explicitly invoked. |
+| **v9.50** | Claude Code 2026 compatibility layer — routines manifest, SubagentStop gate, `/octo:usage` cost attribution, Claude Agent SDK seat. |
+| **v9** | Up to 10 external provider integrations, structured provider debates, configurable multi-LLM councils. |
+
+[Full changelog →](CHANGELOG.md)
+
+<details>
+<summary>Upgrading to 9.5x</summary>
+
+<!-- BEGIN CURRENT MODEL DEFAULTS -->
+- Current fresh configurations use **GPT-5.6 Sol** for Codex implementation/review, **Claude Opus 5** for premium Claude work, and **Claude Sonnet 5** for the standard Claude seat. Existing environment, session, and `providers.json` pins remain unchanged; `OCTOPUS_LEGACY_ROLES=1` restores the pre-frontier role mapping.
+<!-- END CURRENT MODEL DEFAULTS -->
+- Premium Claude role routing (architect, strategist, security-reviewer to Opus) landed in v9.29; restore the older mapping with `OCTOPUS_LEGACY_ROLES=1`.
+
+</details>
+
+## Claude Code Web and Remote Sessions
+
+When an explicit Octopus workflow is running in a hosted, web, or remote-control
+environment, set `OCTOPUS_REMOTE_SESSION=true` in that environment. Once a
+workflow starts, `orchestrate.sh` also recognizes `CLAUDE_CODE_REMOTE=true` or
+`CLAUDE_CODE_WEB=true` and applies unattended-safe runtime defaults: autonomy is
+set to `autonomous`, provider smoke tests are skipped, and the statusline uses a
+lightweight remote-safe display.
 
 ## Quickstart
 
@@ -186,6 +226,30 @@ the upstream `scripts/orchestrate.sh` engine, which probes the configured provid
 with role-specific personas, applies quality gates between the Discover → Define →
 Develop → Deliver phases, and synthesizes a consensus result. In dsh, the single-agent
 probe is exposed as the `octopus` provider in `ctx.subagents`.
+
+| Provider | Integration |
+|----------|-------------|
+| Codex | `codex` CLI |
+| Antigravity | `agy` CLI |
+| Copilot | GitHub Copilot CLI |
+| Qwen | Qwen Code CLI |
+| Ollama | local |
+| Perplexity | API key |
+| OpenRouter | API key |
+| OrcaRouter | API key |
+| OpenCode | OpenCode CLI |
+| Grok | xAI API key |
+
+## Cost & Provider Pricing
+
+Four providers cost nothing extra when you already have access: 🧭 Antigravity CLI (`agy`),
+Codex, and Copilot use existing subscriptions or local auth; Ollama runs locally for free.
+Qwen now requires API-key or Coding-Plan auth.
+
+- [OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-5.6-sol) — GPT-5.6 Sol on Codex implementation/review seats
+- [Perplexity pricing](https://docs.perplexity.ai/docs/getting-started/pricing) — per-request fee applies
+- Antigravity seats bill nothing extra beyond your existing plan
+- Long-context and provider-specific rate rules apply per provider; `/octo:cost` reports usage attribution
 
 ## Documentation
 
