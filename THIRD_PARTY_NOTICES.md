@@ -36,7 +36,30 @@ adaf16712bd20c76cb7de6bca422efa5f4eadcb6196184ed06c20f13ddcdbcf3  Makefile
 346f620daf437b05e615039909e5888165c4514dba6c75f3ab394aa56e3ecba9  commands/research.md
 ```
 
-Every upstream file is copied byte-identical; the only files this port adds are
-`src/`、`test/`、`dist/`、`cordis.patch.yml`、`tsconfig.json` and the port's own
+Every upstream file is copied byte-identical. This repo's own files — the dsh seam
+(`src/`、`test/`、`dist/`、`cordis.patch.yml`、`tsconfig.json`) and the port's
 `package.json`（改名 `dsh-claude-octopus`）、`README.md`、`LICENSE`、
-`THIRD_PARTY_NOTICES.md`、`.gitignore`。任何上游檔案都可用上面的 clone + `cmp` 逐檔比對。
+`THIRD_PARTY_NOTICES.md`、`.gitignore` — have no upstream counterpart.
+
+### Port-adapted upstream files
+
+Two upstream files are adapted from byte-identical, for reasons the playbook
+requires documenting:
+
+- `tests/unit/test-github-work-queue-hook.sh` — the hook under test only fires
+  when the checkout's git remote matches the upstream repo (it is a maintainer
+  tool for `nyldn/claude-octopus`). On a port checkout that remote never
+  matches, so the test registers a temporary `octo-test-upstream` remote for
+  the duration of its two hook executions and removes it after. The hook
+  itself (`hooks/github-work-queue-watch.sh`) is byte-identical.
+- `README.md` — replaced by the port's own bilingual README (per
+  cn-repo-conventions). The upstream test suite asserts that the README
+  documents upstream's product facts (version badge, section headings,
+  command/skill/persona counts, agentmemory/agy mentions); the port README
+  carries those facts so the suite stays intact.
+
+Diff either file against the pinned upstream commit to see the exact changes:
+
+```bash
+git -C /tmp/upstream diff 5d7ac6b6 -- tests/unit/test-github-work-queue-hook.sh
+```
