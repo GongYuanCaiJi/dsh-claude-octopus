@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Context } from "@deepseek-ai/cordis";
 import type { ContentBlock } from "@deepseek-ai/dsh-llm";
-import type { SessionId } from "@deepseek-ai/dsh-session";
+import { SessionId } from "@deepseek-ai/dsh-session";
 import type {
   ResolvedSubagentStartRequest,
   SubagentProvider,
@@ -85,12 +85,15 @@ export function createOctopusSubagentProvider(ctx: Context): SubagentProvider {
       const taskId = `octo-${request.descriptor.label ?? "probe"}-${randomUUID().slice(0, 8)}`;
       // CLI-backed provider: mint a run id unique in the parent namespace (the
       // upstream engine has no dsh session to carry one).
-      const runId = randomUUID() as SessionId;
+      const runId = SessionId(randomUUID());
       const cwd = request.parent.session?.header?.cwd;
+      // The provider owns no child agent to dispose; the caller's signal is the
+      // single cancellation channel for the run (kill the command, surface as
+      // OctopusAbortedError through run.result).
       const resultPromise = runOctopus(
         ctx,
         ["probe-single", ...buildProbeSingleArgs({ agentType, perspective, taskId })],
-        { cwd },
+        { cwd, signal: request.signal },
       ).then<SubagentResult>(async ({ code, stdout }) => {
         if (code !== 0) {
           return { output: [], stopReason: "error" as SubagentStopReason };

@@ -69,12 +69,12 @@ function isSandboxUnavailable(err: unknown): boolean {
 }
 
 /**
- * dsh shell seam adapter: `runOctopus(ctx, [subcommand, ...args], { cwd }) → { code, stdout }`.
+ * dsh shell seam adapter: `runOctopus(ctx, [subcommand, ...args], { cwd, signal }) → { code, stdout }`.
  *
  * Maps the upstream `scripts/orchestrate.sh <subcommand> <args>` surface onto
- * dsh's `ctx.shell.resolve({ command, workdir, timeoutMs, stdoutMaxBytes }) +
- * run(spec)` seam. The dsh shell reports four signals beyond exitCode/stdout;
- * each gets an explicit disposition (playbook: 忽略它們會靜默出錯):
+ * dsh's `ctx.shell.resolve({ command, workdir, timeoutMs, stdoutMaxBytes,
+ * signal }) + run(spec)` seam. The dsh shell reports four signals beyond
+ * exitCode/stdout; each gets an explicit disposition (playbook: 忽略它們會靜默出錯):
  *
  * - `stdout.truncated`  → OctopusTruncatedError (tail-only output misparses)
  * - `timedOut`          → OctopusTimeoutError (never a silent "no changes")
@@ -84,13 +84,14 @@ function isSandboxUnavailable(err: unknown): boolean {
 export async function runOctopus(
   ctx: Context,
   args: readonly string[],
-  options: { readonly cwd?: string } = {},
+  options: { readonly cwd?: string; readonly signal?: AbortSignal } = {},
 ): Promise<OctopusResult> {
   const spec = ctx.shell.resolve({
     command: buildOctopusCommand(args),
     timeoutMs: DEFAULT_TIMEOUT_MS,
     stdoutMaxBytes: DEFAULT_STDOUT_MAX_BYTES,
     workdir: options.cwd,
+    signal: options.signal,
   });
   let result;
   try {
