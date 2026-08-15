@@ -79,7 +79,9 @@ dsh plugin --profile <你的 profile> add ../dsh-claude-octopus
 <summary>移植说明（对上游 <code>nyldn/claude-octopus@5d7ac6b6</code>）</summary>
 
 **逐字保留**：`scripts/`、`commands/`、`skills/`、`agents/`、`hooks/`、`config/`、
-`docs/`、`mcp-server/`、`openclaw/` 等全部 1174 个上游文件一字未改，`cmp` 可验
+`docs/`、`mcp-server/`、`openclaw/` 等 1169 个上游文件逐字未改（上游共 1174 个；
+`README.md`、`package.json`、`LICENSE`、`.gitignore` 为移植自有版本，
+`tests/unit/test-github-work-queue-hook.sh` 为已申明的适配），`cmp` 可验
 （[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) 钉住了上游 commit 与逐字文件 SHA-256）。
 
 **新增的只有 dsh 接缝**（上游没有对应物）：
@@ -294,8 +296,10 @@ what's missing.
 <details>
 <summary>Port notes (vs upstream <code>nyldn/claude-octopus@5d7ac6b6</code>)</summary>
 
-**Kept verbatim**: all 1174 upstream files — `scripts/`, `commands/`, `skills/`,
-`agents/`, `hooks/`, `config/`, `docs/`, `mcp-server/`, `openclaw/` — byte-identical,
+**Kept verbatim**: 1169 of the upstream tree's 1174 files — `scripts/`, `commands/`,
+`skills/`, `agents/`, `hooks/`, `config/`, `docs/`, `mcp-server/`, `openclaw/` —
+byte-identical (`README.md`/`package.json`/`LICENSE`/`.gitignore` are the port's own
+replacements; `tests/unit/test-github-work-queue-hook.sh` is a documented adaptation),
 verifiable with `cmp` ([THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) pins the
 upstream commit and per-file SHA-256).
 

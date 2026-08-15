@@ -53,10 +53,14 @@ requires documenting:
   the duration of its two hook executions and removes it after. The hook
   itself (`hooks/github-work-queue-watch.sh`) is byte-identical.
 - `README.md` — replaced by the port's own bilingual README (per
-  cn-repo-conventions). The upstream test suite asserts that the README
-  documents upstream's product facts (version badge, section headings,
-  command/skill/persona counts, agentmemory/agy mentions); the port README
-  carries those facts so the suite stays intact.
+  cn-repo-conventions). The upstream suites run by `npm test` (smoke, unit)
+  assert that the README documents upstream's product facts (version badge,
+  section headings, command/skill/persona counts, agentmemory/agy mentions);
+  the port README carries those facts and `npm test` stays green. The one
+  integration suite that asserts upstream README wording the port README
+  deliberately does not carry — `integration/test-native-first-docs.sh`
+  (`Claude-native first`, `Octopus for escalation`) — is not part of
+  `npm test` and fails on this port.
 
 Diff either file against the pinned upstream commit to see the exact changes:
 
